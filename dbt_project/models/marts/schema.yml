@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: dim_technologies
+    description: Dimension table combining GitHub and PyPI data for data engineering technologies
+    columns:
+      - name: technology_name
+        description: Standardized technology name
+        tests:
+          - not_null
+          - unique
+      - name: github_repo
+        description: GitHub repository identifier
+      - name: pypi_package
+        description: PyPI package name
+      - name: stars
+        description: GitHub stars count
+      - name: downloads_last_month
+        description: PyPI downloads in last month
+
+  - name: fct_technology_metrics
+    description: Current snapshot of technology metrics with calculated KPIs
+    columns:
+      - name: technology_name
+        description: Technology identifier
+        tests:
+          - not_null
+      - name: popularity_tier
+        description: Categorized popularity level
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['Very Popular', 'Popular', 'Moderate', 'Emerging']
+      - name: usage_tier
+        description: Categorized usage level
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['High Usage', 'Medium Usage', 'Low Usage', 'Minimal Usage']
+
+  - name: fct_technology_history
+    description: Incremental historical tracking of technology metrics
+    config:
+      materialized: incremental
+      unique_key: ['technology_name', 'snapshot_date']
+    columns:
+      - name: technology_name
+        description: Technology identifier
+        tests:
+          - not_null
+      - name: snapshot_date
+        description: Date of the snapshot
+        tests:
+          - not_null
+      - name: stars_change
+        description: Daily change in GitHub stars
+      - name: downloads_change
+        description: Daily change in PyPI downloads
+
+  - name: fct_technology_trends
+    description: Trend analysis with growth rates and moving averages
+    columns:
+      - name: technology_name
+        description: Technology identifier
+        tests:
+          - not_null
+      - name: stars_7day_growth_pct
+        description: 7-day growth percentage for GitHub stars
+      - name: downloads_7day_growth_pct
+        description: 7-day growth percentage for PyPI downloads
+      - name: daily_popularity_rank
+        description: Daily ranking by GitHub stars

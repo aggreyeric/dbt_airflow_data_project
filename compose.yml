@@ -1,0 +1,56 @@
+---
+# Airflow standalone configuration for local development.
+# This setup uses SequentialExecutor and a SQLite database.
+
+x-airflow-config:
+  &airflow-config
+  # You can use a custom extended image by uncommenting the 'build' line.
+  # image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.9.2}
+  build: .
+  user: "${AIRFLOW_UID:-50000}:0"
+  environment:
+    AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.auth.managers.simple.SimpleAuthManager
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin,viewer:viewer"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: 'True'
+    # Snowflake Configuration
+    SNOWFLAKE_ACCOUNT: ${SNOWFLAKE_ACCOUNT}
+    SNOWFLAKE_USER: ${SNOWFLAKE_USER}
+    SNOWFLAKE_PASSWORD: ${SNOWFLAKE_PASSWORD}
+    SNOWFLAKE_DATABASE: ${SNOWFLAKE_DATABASE}
+    SNOWFLAKE_WAREHOUSE: ${SNOWFLAKE_WAREHOUSE}
+    # GitHub Token
+    GITHUB_TOKEN: ${GITHUB_TOKEN}
+    DBT_PROFILES_DIR: /opt/airflow/dags/dbt_project
+  volumes:
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/extractors:/opt/airflow/dags/extractors
+    - ${AIRFLOW_PROJ_DIR:-.}/dbt_project:/opt/airflow/dags/dbt_project
+    # NOTE: do not persist $AIRFLOW_HOME to avoid stale passwords/DB in dev
+    # - airflow-db:/opt/airflow
+
+services:
+  airflow:
+    <<: *airflow-config
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/dags /opt/airflow/logs /opt/airflow/plugins
+        exec /entrypoint airflow standalone
+    ports:
+      - "8080:8080"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
